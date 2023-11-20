@@ -1,8 +1,56 @@
-﻿-- 1) Backup y Backup en linea
+﻿---------------------------------------------------MANEJO DE PERMISOS-----------------------------------------------------------------
+
+
+--------------------------------------------------------TRIGGERS---------------------------------------------------------------------------
+--crear registro de actividad, para ello es necesario una tabla llamada auditoria, esta tendra como funcion registrar
+--operaciones que afecten al contenido de la base de datos, proporcionando así un
+--registro de actividad
+USE base_consorcio
+go
+
+CREATE TABLE auditoria (
+    id_auditoria int identity primary key,
+    tabla_afectada varchar(100),  
+	columna_afectada varchar(100), 
+    accion varchar(10),           
+    fecha_hora datetime,          
+    usuario varchar(50),        
+    valor_anterior varchar(max),  
+    valor_actual varchar(max),     
+);
+
+--- CREAR LOS TRIGGERS CON LOS SCRIPTS "conserjeTriggerUpdate" "conserjeTriggerDelete" "conserjeTriggerInsert" dentro de la carpeta triggers de la tabla conserje (click derecho---> insertar trigger)
+
+---Probamos los triggers agregando registros
+INSERT INTO conserje (apeynom, tel, fechnac, estciv)
+VALUES ('Juan Pérez', '5551234567', '1985-03-15', 'S');
+
+INSERT INTO conserje (apeynom, tel, fechnac, estciv)
+VALUES ('María González', '5559876543', '1990-08-22', 'C');
+
+INSERT INTO conserje (apeynom, tel, fechnac, estciv)
+VALUES ('Carlos Rodríguez', '5555555555', '1982-12-10', 'D');
+
+--probamos modicficando
+UPDATE conserje
+SET tel = '5551112222'
+WHERE idconserje = 1;
+UPDATE conserje
+SET estciv = 'O'
+WHERE idconserje = 2;
+
+---probamos eliminando
+DELETE FROM conserje
+WHERE idconserje = 3;
+
+
+--Estas acciones deben verse reflejadas en la tabla auditoria
+
+------------------------------------------------------Backup y Backup en linea-----------------------------------------------------------
 
 
 -- 1 Verificar el modo de recuperacion de la base de datos
-use base_consorcio
+
 
 SELECT name, recovery_model_desc
 FROM sys.databases
@@ -124,8 +172,7 @@ WITH RECOVERY;
 
 select * from gasto
 
---------------------------------------------------------------------------------------------------------------------------------
--- 2) INDICES COLUMNARES--
+------------------------------------------------------- INDICES COLUMNARES--------------------------------------------------------------
 use base_consorcio;
 
 
@@ -190,8 +237,8 @@ WHERE RowNumber BETWEEN 1 AND 1000000; -- Ajusta el tama�o del lote seg�n tu
 
 
 
--- 3) Optimización de busqueda a travez de indices--
---PRIMER EJECUCION DE CONSULTA -----------------------------------------------------------------
+----------------------------------------------Optimización de busqueda a travez de indices----------------------------------------------
+--PRIMER EJECUCION DE CONSULTA 
 --Permite ver detalle de los tiempos de ejecucionde la consulta
 SET STATISTICS TIME ON;
 SET STATISTICS IO ON;
@@ -256,14 +303,8 @@ INNER JOIN tipogasto t ON g.idtipogasto = t.idtipogasto
 WHERE g.periodo = 8 ;
 go
 
-------------------------------------------------------------------------------------------------------------------------------------------
+------------------------------------------------- Manejo de Transacciones y transacciones anidadas--------------------------------------
 
--- 4) Manejo de Transacciones y transacciones anidadas
-/*----------------------------------------
-SCRIPT APLICADO A LAS PRUEBAS PRACTICAS SOBRE TRANSACCIONES
-BASE DE DATOS 1 - COMISION 3
-GRUPO 2
-----------------------------------------*/
 -- USE base_consorcio;
 
 -- CREACION DE LAS TRANSACCIONES
@@ -414,9 +455,10 @@ SELECT * FROM consorcio WHERE direccion = 'PARAGUAY N 999';
 
 -- MUESTAR LOS ULTIMOS 3 REGISTROS DE GASTOS CARGADOS
 SELECT TOP 4 * FROM gasto ORDER BY idgasto DESC; 
-------------------------------------------------------------------------------------------------------------------------
 
------ 5) Vistas y vistas Indexadas-------------------------------------
+
+
+-------------------------------------------------------------- Vistas y vistas Indexadas--------------------------------------------------
 
 -- NOTA PRINCIPAL 
 -- Al crear la base de datos, crearla con el campo "fechaPago" de la tabla "gasto" como campo único para que después al crear el índice para la vista indexada no se generen errores.
@@ -494,3 +536,83 @@ ADD CONSTRAINT unicoFechaPago UNIQUE (fechaPago);
 CREATE UNIQUE CLUSTERED INDEX IX_vistaGeneral_FechaPago
 ON [dbo].[vistaGeneral] (fechaPago);
 select * from vistaGeneral order by nombre asc ;
+
+
+-----------------------------------------------------REPLICA DE BASE DE DATOS-----------------------------------------------------------
+--Primero, es muy importante conocer cuál es el nombre de 
+--nuestro equipo.
+
+--También debemos crear una carpeta nueva en cualquier parte de nuestro equipo, la cual nos va 
+--a servir para la distribución. Una vez creamos esta carpeta, entramos en ella y anotamos la 
+--dirección de su ruta para usarla más adelante.
+
+--NECESITAMOS 3 PERFILES 
+
+--El “Publicador” será el servidor Instancia de SQL server que estará encargado de Publicar la Base 
+--de Datos que es la que se va a Replicar a los demás servidores.
+
+--El “Distribuidor” será el encargado de distribuir a los suscriptores la Base de Datos que ha 
+--publicado el Publicador. Normalmente el Publicador y el Distribuidor se configuran en el mismo 
+--Servidor.
+--El “Suscriptor” será la Instancia que reciba la Réplica del Publicador.
+
+--PUBLICADOR -------------------------------------------------------
+--Activando servicios
+--Es importante comprobar, en primer lugar, si tenemos activados los servicios de Windows 
+--requeridos para seguir los pasos de esta sección.
+--Apretamos el botón de Windows ---> Buscamos en la barra de búsqueda SQL --> Buscamos y seleccionamos el Administrador de configuración de SQL Server
+
+-- De saer la promera vez debemos activar estos servicios para continuar con la configuración de replicación --En los servicios "SQL Server Browser" y "SQL Server Agent":
+--Seleccionamos Propiedades. Se nos abrirá una nueva ventana, seleccionamos la pestaña Service. Se nos abrirá 
+--una nueva ventana, seleccionamos en Disabled y marcamos la opción Automatic. Por último, 
+--apretamos el botón Aceptar y cerramos las ventanas del servicio. Lo msimo con 
+
+
+--DISTRIBUIDOR-------------------------------------------------------------
+--Abrimos SQL Server. Debemos conectarnos al servidor que será el publicador.
+
+---CLick derecho en la carpeta Replication y 
+--seleccionar la opción Configure Distribution
+
+--Apretaremos el botón Siguiente hasta llegar a la sección de 
+--Snapshot Folder. La dirección que viene de forma predeterminada debemos cambiarla por la 
+--ruta que anotamos anteriormente de la carpeta Distribución.
+
+--apretamos el botón Next > hasta llegar al botón Finish, 
+--presionamos el botón Finish.
+
+--SUSCRIPTOR--------------------------------------------------------------------
+--necesitamos tener instalado SQL Server 
+--en otra computadora que esté conectada a nuestra red local o instalar una máquina virtual en 
+--nuestra computadora.
+--presionamos el botón Connect en el 
+--manejador SQL y seleccionamos la opción Database Engine
+--colocamos en Sever name el nombre del equipo suscriptor. Usamos la 
+--autenticación SQL Server para conectarnos a la base de datos del equipo suscriptor.
+
+--En la base de datos del equipo publicador, desplegamos la pestaña Replication, 
+--hacemos clic derecho en Local Subscriptions y seleccionamos New Subscription
+
+
+--Apretamos el botón Add Subscriber y seleccionamos la opción Add SQL Server 
+--Subscriber… En la siguiente ventana, en Server name escribiremos el nombre del equipo 
+--del servidor suscriptor.
+
+--Desplegamos la pestaña de Subscription Database, y seleccionamos la base de datos donde los datos van a ser 
+--replicados
+
+--Seleccionamos los tres puntos
+
+--Marcamos la opción Run under the SQL Sever Agent service Account
+
+--Marcamos la opción Using the following SQL Server login. Luego, completamos las 
+--credenciales de inicio de sesión del servidor suscriptor.
+
+--presionamos el botón Next > hasta finalizar, manteniendo todas las opciones siguientes de forma predeterminada.
+
+----INSERTAMOS REGISTROS
+Insert into administrador(apeynom,viveahi,tel,sexo,fechnac) values ('SAUCEDO FAUSTINA', 'S', '3678235639', 'F', '19875523')
+Insert into administrador(apeynom,viveahi,tel,sexo,fechnac) values ('GONZALEZ LIDIA ESTER', 'N', '3671232689', 'F', '19841555')
+Insert into administrador(apeynom,viveahi,tel,sexo,fechnac) values ('ARAUJO GUILLERMO JOSE', 'S', '3672235689', 'M', '19551013')
+
+---Estos registros deben verse reflejados en la base correspondiente al perfil suscriptor
